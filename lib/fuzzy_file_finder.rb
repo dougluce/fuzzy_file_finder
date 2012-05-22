@@ -105,11 +105,14 @@ class FuzzyFileFinder
   # The list of glob patterns to ignore.
   attr_reader :ignores
 
+  # The list of glob patterns to allow in the search.
+  attr_reader :allows
+
   # Initializes a new FuzzyFileFinder. This will scan the
   # given +directories+, using +ceiling+ as the maximum number
   # of entries to scan. If there are more than +ceiling+ entries
   # a TooManyEntries exception will be raised.
-  def initialize(directories=['.'], ceiling=10_000, ignores=nil)
+  def initialize(directories=['.'], ceiling=10_000, ignores=nil, allows="*")
     directories = Array(directories)
     directories << "." if directories.empty?
 
@@ -124,6 +127,7 @@ class FuzzyFileFinder
     @ceiling = ceiling
 
     @ignores = Array(ignores)
+    @allows = Array(allows)
 
     rescan!
   end
@@ -224,11 +228,18 @@ class FuzzyFileFinder
 
         if File.directory?(full)
           follow_tree(Directory.new(full))
-        elsif !ignore?(full.sub(@shared_prefix_re, ""))
+        elsif allow?(full.sub(@shared_prefix_re, ""))
           files.push(FileSystemEntry.new(directory, entry))
         end
       end
     end
+
+    # Returns +true+ if the given name is in the allow patterns
+    # and isn't being ignored.
+    def allow?(name)
+      allows.any? { |pattern| File.fnmatch(pattern, name) } \
+      and not ignore?(name)
+    end      
 
     # Returns +true+ if the given name matches any of the ignore
     # patterns.
